@@ -15,33 +15,35 @@ export class AuthService {
     ) { }
 
     async login(loginDto: LoginDto) {
-        const { email, password } = loginDto;
-
-        // Using query builder to select password explicitly while also loading role relation
         const user = await this.userRepository
             .createQueryBuilder('user')
             .leftJoinAndSelect('user.role', 'role')
-            .where('user.email = :email', { email })
             .addSelect('user.password')
+            .where('user.email = :email', { email: loginDto.email })
             .getOne();
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            throw new UnauthorizedException('Invalid credentials');
+        if (!user) {
+            throw new UnauthorizedException('Invalid email or password');
         }
 
-        const payload = {
+        const passwordMatch = await bcrypt.compare(loginDto.password, user.password);
+        if (!passwordMatch) {
+            throw new UnauthorizedException('Invalid email or password');
+        }
+
+        const token = this.jwtService.sign({
             sub: user.id,
             email: user.email,
             role: user.role.name,
-            name: user.name
-        };
+            name: user.name,
+        });
 
         return {
-            access_token: this.jwtService.sign(payload),
+            access_token: token,
             user: {
                 id: user.id,
-                email: user.email,
                 name: user.name,
+                email: user.email,
                 role: user.role.name,
             },
         };

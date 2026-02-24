@@ -3,9 +3,7 @@ import {
     Get,
     Post,
     Body,
-    Patch,
     Param,
-    Delete,
     UseGuards,
     Request,
     HttpCode,
@@ -26,28 +24,13 @@ export class CommentsController {
     create(
         @Param('ticketId') ticketId: string,
         @Body() createCommentDto: CreateCommentDto,
-        @Request() req
+        @Request() req,
     ) {
-        return this.commentsService.create(+ticketId, createCommentDto, req.user);
+        return this.commentsService.addComment(+ticketId, createCommentDto, req.user);
     }
 
     @Get('tickets/:ticketId/comments')
-    findAllByTicket(@Param('ticketId') ticketId: string, @Request() req) {
-        return this.commentsService.findAllByTicket(+ticketId, req.user);
-    }
-
-    @Patch('comments/:id')
-    update(
-        @Param('id') id: string,
-        @Body() createCommentDto: CreateCommentDto,
-        @Request() req
-    ) {
-        return this.commentsService.update(+id, createCommentDto, req.user);
-    }
-
-    @Delete('comments/:id')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    async remove(@Param('id') id: string, @Request() req): Promise<void> {
-        await this.commentsService.remove(+id, req.user);
+    getAll(@Param('ticketId') ticketId: string, @Request() req) {
+        return this.commentsService.getCommentsByTicket(+ticketId, req.user);
     }
 }

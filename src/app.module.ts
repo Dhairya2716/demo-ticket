@@ -21,21 +21,17 @@ import { DatabaseSeeder } from './database-seeder.service';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const dbConfig = {
-          type: 'postgres' as const,
-          host: configService.get<string>('DATABASE_HOST'),
-          port: configService.get<number>('DATABASE_PORT'),
-          username: configService.get<string>('DATABASE_USERNAME'),
-          password: configService.get<string>('DATABASE_PASSWORD'),
-          database: configService.get<string>('DATABASE_NAME'),
-          entities: [Role, User, Ticket, TicketComment, TicketStatusLog],
-          synchronize: true,
-          logging: true,
-        };
-        console.log('TypeORM Config:', { ...dbConfig, password: '***' });
-        return dbConfig;
-      },
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres' as const,
+        host: configService.get<string>('DATABASE_HOST'),
+        port: configService.get<number>('DATABASE_PORT'),
+        username: configService.get<string>('DATABASE_USERNAME'),
+        password: configService.get<string>('DATABASE_PASSWORD'),
+        database: configService.get<string>('DATABASE_NAME'),
+        entities: [Role, User, Ticket, TicketComment, TicketStatusLog],
+        synchronize: true,
+        logging: false,
+      }),
     }),
     AuthModule,
     UsersModule,

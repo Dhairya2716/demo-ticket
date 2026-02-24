@@ -19,42 +19,41 @@ export class DatabaseSeeder implements OnModuleInit {
 
     async onModuleInit() {
         await this.seedRoles();
-        await this.seedAdmin();
+        await this.seedDefaultAdmin();
     }
 
     private async seedRoles() {
-        const roles = Object.values(UserRole);
-        for (const roleName of roles) {
+        for (const roleName of Object.values(UserRole)) {
             const exists = await this.roleRepository.findOne({ where: { name: roleName } });
             if (!exists) {
                 await this.roleRepository.save(this.roleRepository.create({ name: roleName }));
-                this.logger.log(`Created role: ${roleName}`);
+                this.logger.log(`Role created: ${roleName}`);
             }
         }
     }
 
-    private async seedAdmin() {
+    private async seedDefaultAdmin() {
         const adminEmail = 'admin@example.com';
         const exists = await this.userRepository.findOne({ where: { email: adminEmail } });
 
         if (!exists) {
             const managerRole = await this.roleRepository.findOne({ where: { name: UserRole.MANAGER } });
             if (!managerRole) {
-                this.logger.error('MANAGER role not found during seeding');
+                this.logger.error('MANAGER role not found, skipping admin seed');
                 return;
             }
 
-            const hashedPassword = await bcrypt.hash('admin123', 10);
+            const hashed = await bcrypt.hash('admin123', 10);
 
             await this.userRepository.save(
                 this.userRepository.create({
                     name: 'System Admin',
                     email: adminEmail,
-                    password: hashedPassword,
+                    password: hashed,
                     role: managerRole,
                 }),
             );
-            this.logger.log(`Created default manager: ${adminEmail}`);
+            this.logger.log(`Default admin created: ${adminEmail}`);
         }
     }
 }

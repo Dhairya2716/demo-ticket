@@ -14,12 +14,12 @@ export class UsersController {
     @Post()
     @Roles(UserRole.MANAGER)
     async create(@Body() createUserDto: CreateUserDto) {
-        return this.usersService.create(createUserDto);
+        return this.usersService.createUser(createUserDto);
     }
 
     @Get()
     @Roles(UserRole.MANAGER)
-    async findAll() {
-        return this.usersService.findAll();
+    async getAll() {
+        return this.usersService.getAllUsers();
     }
 }

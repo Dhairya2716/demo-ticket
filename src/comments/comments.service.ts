@@ -1,6 +1,5 @@
 import {
     Injectable,
-    NotFoundException,
     ForbiddenException,
     Inject,
     forwardRef,
@@ -21,43 +20,35 @@ export class CommentsService {
         private ticketsService: TicketsService,
     ) { }
 
-    async create(ticketId: number, createCommentDto: CreateCommentDto, user: any) {
-        const ticket = await this.ticketsService.findOne(ticketId);
+    async addComment(ticketId: number, dto: CreateCommentDto, user: any) {
+        const ticket = await this.ticketsService.getTicketById(ticketId);
 
-        // Permission Check: MANAGER; SUPPORT if assigned; USER if owner
-        const isAllowed =
-            user.role === UserRole.MANAGER ||
-            (user.role === UserRole.SUPPORT && ticket.assigned_to?.id === user.userId) ||
-            (user.role === UserRole.USER && ticket.created_by?.id === user.userId);
+        const isManager = user.role === UserRole.MANAGER;
+        const isAssignedSupport = user.role === UserRole.SUPPORT && ticket.assigned_to?.id === user.userId;
+        const isTicketOwner = user.role === UserRole.USER && ticket.created_by?.id === user.userId;
 
-        if (!isAllowed) {
-            throw new ForbiddenException(
-                'You do not have permission to comment on this ticket',
-            );
+        if (!isManager && !isAssignedSupport && !isTicketOwner) {
+            throw new ForbiddenException('You are not allowed to comment on this ticket');
         }
 
         const comment = this.commentRepository.create({
             ticket: { id: ticketId } as any,
             user: { id: user.userId } as any,
-            comment: createCommentDto.comment,
+            comment: dto.comment,
         });
 
         return this.commentRepository.save(comment);
     }
 
-    async findAllByTicket(ticketId: number, user: any) {
-        const ticket = await this.ticketsService.findOne(ticketId);
+    async getCommentsByTicket(ticketId: number, user: any) {
+        const ticket = await this.ticketsService.getTicketById(ticketId);
 
-        // Same permission check as create
-        const isAllowed =
-            user.role === UserRole.MANAGER ||
-            (user.role === UserRole.SUPPORT && ticket.assigned_to?.id === user.userId) ||
-            (user.role === UserRole.USER && ticket.created_by?.id === user.userId);
+        const isManager = user.role === UserRole.MANAGER;
+        const isAssignedSupport = user.role === UserRole.SUPPORT && ticket.assigned_to?.id === user.userId;
+        const isTicketOwner = user.role === UserRole.USER && ticket.created_by?.id === user.userId;
 
-        if (!isAllowed) {
-            throw new ForbiddenException(
-                'You do not have permission to view comments for this ticket',
-            );
+        if (!isManager && !isAssignedSupport && !isTicketOwner) {
+            throw new ForbiddenException('You are not allowed to view comments for this ticket');
         }
 
         return this.commentRepository.find({
@@ -65,40 +56,5 @@ export class CommentsService {
             relations: ['user'],
             order: { created_at: 'DESC' },
         });
-    }
-
-    async update(id: number, createCommentDto: CreateCommentDto, user: any) {
-        const comment = await this.commentRepository.findOne({
-            where: { id },
-            relations: ['user'],
-        });
-        if (!comment) {
-            throw new NotFoundException('Comment not found');
-        }
-
-        // Permission Check: MANAGER or comment author
-        if (user.role !== UserRole.MANAGER && comment.user?.id !== user.userId) {
-            throw new ForbiddenException('You can only edit your own comments');
-        }
-
-        comment.comment = createCommentDto.comment;
-        return this.commentRepository.save(comment);
-    }
-
-    async remove(id: number, user: any): Promise<void> {
-        const comment = await this.commentRepository.findOne({
-            where: { id },
-            relations: ['user'],
-        });
-        if (!comment) {
-            throw new NotFoundException('Comment not found');
-        }
-
-        // Permission Check: MANAGER or comment author
-        if (user.role !== UserRole.MANAGER && comment.user?.id !== user.userId) {
-            throw new ForbiddenException('You can only delete your own comments');
-        }
-
-        await this.commentRepository.remove(comment);
     }
 }

@@ -16,47 +16,45 @@ export class UsersService {
         private roleRepository: Repository<Role>,
     ) { }
 
-    async create(createUserDto: CreateUserDto) {
-        const { email, password, role: roleName, name } = createUserDto;
-
-        const existingUser = await this.userRepository.findOne({ where: { email } });
-        if (existingUser) {
+    async createUser(createUserDto: CreateUserDto) {
+        const existing = await this.userRepository.findOne({ where: { email: createUserDto.email } });
+        if (existing) {
             throw new ConflictException('User with this email already exists');
         }
 
-        const role = await this.roleRepository.findOne({ where: { name: roleName } });
+        const role = await this.roleRepository.findOne({ where: { name: createUserDto.role } });
         if (!role) {
-            throw new NotFoundException(`Role ${roleName} not found`);
+            throw new NotFoundException('Role not found');
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashed = await bcrypt.hash(createUserDto.password, 10);
 
         const user = this.userRepository.create({
-            name,
-            email,
-            password: hashedPassword,
+            name: createUserDto.name,
+            email: createUserDto.email,
+            password: hashed,
             role,
         });
 
-        const savedUser = await this.userRepository.save(user);
-        const { password: _, ...result } = savedUser;
+        const saved = await this.userRepository.save(user);
+        const { password, ...result } = saved;
         return result;
     }
 
-    async findAll() {
+    async getAllUsers() {
         return this.userRepository.find({
             relations: ['role'],
         });
     }
 
-    async findOneByEmail(email: string) {
+    async getUserByEmail(email: string) {
         return this.userRepository.findOne({
             where: { email },
             relations: ['role'],
         });
     }
 
-    async findOneById(id: number) {
+    async getUserById(id: number) {
         return this.userRepository.findOne({
             where: { id },
             relations: ['role'],

@@ -29,23 +29,23 @@ export class TicketsController {
     @Roles(UserRole.USER, UserRole.MANAGER)
     @HttpCode(HttpStatus.CREATED)
     create(@Body() createTicketDto: CreateTicketDto, @Request() req) {
-        return this.ticketsService.create(createTicketDto, req.user);
+        return this.ticketsService.createTicket(createTicketDto, req.user);
     }
 
     @Get()
-    findAll(@Request() req) {
-        return this.ticketsService.findAll(req.user);
+    getAll(@Request() req) {
+        return this.ticketsService.getAllTickets(req.user);
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.ticketsService.findOne(+id);
+    getOne(@Param('id') id: string) {
+        return this.ticketsService.getTicketById(+id);
     }
 
     @Patch(':id/assign')
     @Roles(UserRole.MANAGER, UserRole.SUPPORT)
     assign(@Param('id') id: string, @Body() assignTicketDto: AssignTicketDto) {
-        return this.ticketsService.assign(+id, assignTicketDto);
+        return this.ticketsService.assignTicket(+id, assignTicketDto);
     }
 
     @Patch(':id/status')
@@ -53,15 +53,15 @@ export class TicketsController {
     updateStatus(
         @Param('id') id: string,
         @Body() updateStatusDto: UpdateStatusDto,
-        @Request() req
+        @Request() req,
     ) {
-        return this.ticketsService.updateStatus(+id, updateStatusDto, req.user);
+        return this.ticketsService.changeStatus(+id, updateStatusDto, req.user);
     }
 
     @Delete(':id')
     @Roles(UserRole.MANAGER)
     @HttpCode(HttpStatus.NO_CONTENT)
     async remove(@Param('id') id: string): Promise<void> {
-        await this.ticketsService.remove(+id);
+        await this.ticketsService.deleteTicket(+id);
     }
 }

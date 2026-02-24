@@ -24,7 +24,7 @@ export class TicketsService {
         private userRepository: Repository<User>,
     ) { }
 
-    async create(createTicketDto: CreateTicketDto, user: any) {
+    async createTicket(createTicketDto: CreateTicketDto, user: any) {
         const ticket = this.ticketRepository.create({
             ...createTicketDto,
             created_by: { id: user.userId } as any,
@@ -33,23 +33,23 @@ export class TicketsService {
         return this.ticketRepository.save(ticket);
     }
 
-    async findAll(user: any) {
-        const query = this.ticketRepository.createQueryBuilder('ticket')
-            .leftJoinAndSelect('ticket.created_by', 'created_by')
-            .leftJoinAndSelect('ticket.assigned_to', 'assigned_to')
-            .leftJoinAndSelect('created_by.role', 'creatorRole')
-            .leftJoinAndSelect('assigned_to.role', 'assigneeRole');
+    async getAllTickets(user: any) {
+        const tickets = await this.ticketRepository.find({
+            relations: ['created_by', 'created_by.role', 'assigned_to', 'assigned_to.role'],
+        });
 
         if (user.role === UserRole.SUPPORT) {
-            query.andWhere('assigned_to.id = :userId', { userId: user.userId });
-        } else if (user.role === UserRole.USER) {
-            query.andWhere('created_by.id = :userId', { userId: user.userId });
+            return tickets.filter(ticket => ticket.assigned_to?.id === user.userId);
         }
 
-        return query.getMany();
+        if (user.role === UserRole.USER) {
+            return tickets.filter(ticket => ticket.created_by?.id === user.userId);
+        }
+
+        return tickets;
     }
 
-    async findOne(id: number) {
+    async getTicketById(id: number) {
         const ticket = await this.ticketRepository.findOne({
             where: { id },
             relations: [
@@ -62,71 +62,68 @@ export class TicketsService {
                 'comments.user.role',
             ],
         });
+
         if (!ticket) {
-            throw new NotFoundException(`Ticket with ID ${id} not found`);
+            throw new NotFoundException('Ticket not found');
         }
+
         return ticket;
     }
 
-    async assign(id: number, assignTicketDto: AssignTicketDto) {
-        const ticket = await this.findOne(id);
-        const targetUser = await this.userRepository.findOne({
+    async assignTicket(id: number, assignTicketDto: AssignTicketDto) {
+        const ticket = await this.getTicketById(id);
+
+        const user = await this.userRepository.findOne({
             where: { id: assignTicketDto.userId },
             relations: ['role'],
         });
 
-        if (!targetUser) {
+        if (!user) {
             throw new NotFoundException('User not found');
         }
 
-        if (targetUser.role.name === UserRole.USER) {
-            throw new BadRequestException('Tickets cannot be assigned to users with role USER');
+        if (user.role.name === UserRole.USER) {
+            throw new BadRequestException('Cannot assign ticket to a user with USER role');
         }
 
-        ticket.assigned_to = targetUser;
+        ticket.assigned_to = user;
         await this.ticketRepository.save(ticket);
 
-        // Re-fetch with all relations to return full object
-        return this.findOne(id);
+        return this.getTicketById(id);
     }
 
-    async updateStatus(id: number, updateStatusDto: UpdateStatusDto, user: any) {
-        const ticket = await this.findOne(id);
-        const newStatus = updateStatusDto.status;
+    async changeStatus(id: number, updateStatusDto: UpdateStatusDto, requestUser: any) {
+        const ticket = await this.getTicketById(id);
         const oldStatus = ticket.status;
+        const newStatus = updateStatusDto.status;
 
-        if (!this.isValidTransition(oldStatus, newStatus)) {
-            throw new BadRequestException(`Invalid status transition from ${oldStatus} to ${newStatus}`);
+        if (!this.isValidStatusChange(oldStatus, newStatus)) {
+            throw new BadRequestException('Invalid status transition: ' + oldStatus + ' -> ' + newStatus);
         }
 
         ticket.status = newStatus;
         await this.ticketRepository.save(ticket);
 
-        // Log the status change
         const log = this.statusLogRepository.create({
             ticket: { id: ticket.id } as any,
             old_status: oldStatus,
             new_status: newStatus,
-            changedBy: { id: user.userId } as any,
+            changedBy: { id: requestUser.userId } as any,
         });
         await this.statusLogRepository.save(log);
 
-        // Re-fetch with all relations
-        return this.findOne(id);
+        return this.getTicketById(id);
     }
 
-    private isValidTransition(oldStatus: TicketStatus, newStatus: TicketStatus): boolean {
-        const transitions: Record<TicketStatus, TicketStatus[]> = {
-            [TicketStatus.OPEN]: [TicketStatus.IN_PROGRESS],
-            [TicketStatus.IN_PROGRESS]: [TicketStatus.RESOLVED],
-            [TicketStatus.RESOLVED]: [TicketStatus.CLOSED],
-            [TicketStatus.CLOSED]: [],
-        };
-        return transitions[oldStatus]?.includes(newStatus) ?? false;
+    private isValidStatusChange(current: string, next: string): boolean {
+        if (current === 'OPEN' && next === 'IN_PROGRESS') return true;
+        if (current === 'IN_PROGRESS' && next === 'RESOLVED') return true;
+        if (current === 'RESOLVED' && next === 'CLOSED') return true;
+        return false;
     }
 
-    async remove(id: number): Promise<void> {
-        const ticket = await this.findOne(id);
+    async deleteTicket(id: number) {
+        const ticket = await this.getTicketById(id);
         await this.ticketRepository.remove(ticket);
     }
 }
